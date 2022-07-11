@@ -27,46 +27,13 @@
         </div>
       </nav>
 
-      <ul class="list-group list-group-flush">     
-
-      <% for (let i = 0; i< posts.length ; i++) { %>
-        <li class="list-group-item">
-          <p>글번호 : <%= posts[i]._id %></p>
-          할 일 제목 : <%= posts[i].title %>
-          <br>
-          할일 마감 날짜: <%= posts[i].date %>          
-          <!-- data-id 속성에 _id를 숨겨달라고 요청한다. -->
-          <button class="delete" data-id="<%= posts[i]._id %>">삭제</button>
-        </li>
-       
-      <% } %>
-
-    </ul>
   <!-- 제이쿼리 라이브러리 -->
-    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+
+    <h4>제목 : <%= data._id %> 번 게시물의 <%= data.title %></h4>
+    <h6>날짜 : <%= data.date %> </h6>
+    
   
-    <!-- class가 delete인 요소를 클릭하면 ajax 요청을 실행한다. -->
-    <script>
-      $('.delete').click(function(e){
-        let clickNUm = $(this)
-
-        $.ajax({
-          method : 'DELETE',
-          url : '/delete',
-          //현재 누른 버튼의 data-id를 가져온다.
-          data : { _id : e.target.dataset.id },
-        }).done(function(결과){
-          console.log('삭제 ajax 요청에 성공했습니다.')
-          clickNum.parent('li').fadeOut();
-
-          //AJAX 성공시 실행할 코드는 여기
-        }).fail(function(){
-          console.log('삭제 ajax 요청에 실패했습니다.')
-          //요청이 실패했을 때 적는 코드는 여기
-          
-        })
-      });
-    </script>      
 
     <!-- Optional JavaScript -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->

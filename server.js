@@ -2,7 +2,11 @@ const express = require('express') //라이브러리 첨부
 const { Db } = require('mongodb')
 const app = express() //라이브러리로 객체 생성
 const MongoClient = require('mongodb').MongoClient
+const methodOverride = require('method-override')
+app.use(methodOverride('_method'))
 app.set('view engine', 'ejs')
+
+
 
 
 let db
@@ -45,6 +49,14 @@ app.get('/write', function(req, res){
     res.sendFile(__dirname + '/write.html')
 })
 
+app.get('/detail/:id', function(req, res){
+    
+    db.collection('post').findOne({ _id : parseInt(req.params.id) }, function(err, result){
+    
+        res.render('detail.ejs', {data : result} )
+    })
+  });
+
 app.post('/add', function(req,res){ //누군가가 add로 POST요청을 하면
     res.send('전송완료') //페이지에 전송완료 응답을 한다.
     console.log(req.body)
@@ -60,20 +72,20 @@ app.post('/add', function(req,res){ //누군가가 add로 POST요청을 하면
         
     //_id= 총게시물갯수 + 1 (auto increment)
 
-    db.collection('post').insertOne({_id: total + 1, title: req.body.title, date:req.body.date},function(에러,결과){
-        if(에러) console.log(에러)
-        console.log(result.totalPost)
-        //몽고DB에서 데이터를 수정할 때 updateOne()을 사용한다. 많은 것은 updateMany이다.
-        //updateOne(이런데이터를,이렇게수정해줘,function(){})
+        db.collection('post').insertOne({_id: total + 1, title: req.body.title, date:req.body.date},function(에러,결과){
+                if(에러) console.log(에러)
+                console.log(result.totalPost)
+                //몽고DB에서 데이터를 수정할 때 updateOne()을 사용한다. 많은 것은 updateMany이다.
+                //updateOne(이런데이터를,이렇게수정해줘,function(){})
 
-        //operator : 연산자.
-    // {$set : {totalPost:바꿀값}}
-    // {$inc : {totalPost:기존값에 더해줄 값}} 같은 것들이 있다.
-//name이 게시물갯수인것을 찾아, 그곳의 totalPost를 수정한다.
-        db.collection('counter').updateOne({name:'게시물갯수'},{ $inc : {totalPost:1}},function(err,result){
-            if(err) return console.log('totalPost 증가 중 에러 발생')
+                //operator : 연산자.
+            // {$set : {totalPost:바꿀값}}
+            // {$inc : {totalPost:기존값에 더해줄 값}} 같은 것들이 있다.
+        //name이 게시물갯수인것을 찾아, 그곳의 totalPost를 수정한다.
+                db.collection('counter').updateOne({name:'게시물갯수'},{ $inc : {totalPost:1}},function(err,result){
+                       if(err) return console.log('totalPost 증가 중 에러 발생')
 
-        })
+                })
         
 
     })
@@ -98,11 +110,97 @@ app.get('/list', function(req,res){
 })
 
 app.delete('/delete', function(req,res){
+    console.log(req.body) //요청 시 보낸 데이터가 출력된다.
+    // 요청.body에 담긴 정보에서 내가 삭제할 데이터를 찾아 삭제해 주세요
+    req.body._id = parseInt(req.body._id)
+    console.log(req.body._id)
+    // 실수했던곳 : deleteOne의 첫번째 파라미터는 req.body 이다. 
+    // (나는 req.bkdy._id 라고 해서 실행되지 않았었음) 
+    db.collection('post').deleteOne(req.body,function(err, result){
+        console.log('삭제완료')
+        res.status(200).send({ message:'삭제에 성공했습니다.'}); //응답에 성공했을 때 띄우는 메세지
+    })
     
 })
 
-// 어떤 사람이 /add로 post 요청을 하면, 
-// 데이터 2개를 보내주는데,
-// 이때 이것은 날짜와 제목이다,
-// 이 때 post라는 이름을 가진 collection에 데이터 두개를 저장한다.
-//오브젝트 형식으로 저장하기~
+app.get('/edit/:id', function(req, res){
+    db.collection('post').findOne({_id:parseInt(req.params.id)},function(err,result){
+        // 데이터를 찾아 post라는 이름으로 전송한다.
+        res.render('edit.ejs',{post:result})
+    })
+  
+})
+
+//서버로 put 요청이 오면, 담긴 데이터를 수정한다.
+
+app.put('/edit', function(req,res){
+    //폼에 담긴 제목 데이터, 날짜 데이터를 가지고
+    // db.collection'post'에서 찾아 업데이트한다.
+    // updateONe(어떤게시물을 수정할것인지,수정값,콜백함수)
+
+    //operator $set = 업데이트 해 주시되, 없으면 추가해주세요 
+
+    db.collection('post').updateOne({ _id:parseInt(req.body.id) },
+    { $set: { title:req.body.title, date:req.body.date }},function(err,result){
+      res.redirect('/list') //수정완료 시 다른 페이지로 이동한다.(응답코드)
+    })
+})
+
+// passport 라이브러리를 첨부한다. node.js 환경에서 로그인 기능 구현을 쉽게 할 수 있도록 도와준다.
+
+const passport = require('passport');
+const LocalStrategy = require('passport-local')
+const session = require('express-session')
+
+//미들웨어 사용 준비를 한다.
+//미들웨어 : 웹서버가 요청하면 요청과 응답 중간에 실행하는 코드들을 말한다.
+app.use(session({secret:'비밀코드', resave:true, saveUninitialized: false}))
+app.use(passport.initialize())
+app.use(passport.session())
+
+app.get('/login', function(req,res){
+    res.render('login.ejs')
+})
+//passport.authenticate()를 통해 아이디와 비밀번호를 검사한다.
+app.post('/login', passport.authenticate('local', //local 방식으로 인증한다.
+{
+    failureRedirect: '/fail' //회원인증에 실패하면 /fail로 이동한다.
+}), function(req,res){
+    res.redirect('/') //만일 로그인에 성공하면, 메인 페이지로 보낸다.
+})
+
+// failureRefirect가 호출되면 실행된다. 
+
+passport.use(new LocalStrategy({ //Strategy방식 인증을 구현한다.
+    usernameField: 'id',
+    passwordField: 'pw',
+    session: true,
+    passReqToCallback: false,
+  }, function (입력한아이디, 입력한비번, done) {
+    console.log(입력한아이디, 입력한비번);
+    //DB에 입력한 아이디가 있는지 찾는다.
+    db.collection('login').findOne({ id: 입력한아이디 }, function (에러, 결과) {
+        //에러처리
+      if (에러) return done(에러)
+        //일치하는 아이디가 없을 시 실행        
+    //done(서버에러,성공시 사용자 db data, 에러메세지 넣는곳)
+      if (!결과) return done(null, false, { message: '존재하지않는 아이디요' })
+    //   아이디가 있다면 비밀번호를 검증한다. 
+      if (입력한비번 == 결과.pw) {
+        return done(null, 결과)
+      } else {
+        return done(null, false, { message: '비번틀렸어요' })
+      }
+    })
+  }));
+
+  //id를 이용해 세셩을 저장시킨다.(로그인 성공시 실행된다.)
+  //그리고 아이디와 비밀번호로 생성한 세션을 쿠키로 보낸다.
+  passport.serializeUser(function(user, done){
+    done(null, user.id)
+  })
+
+  //이 세션 아이디를 가진 사람을 db에서 찾아달라는 구문(MyPage를 만들때 사용한다.)
+  passport.deserializeUser(function(아이디,done){
+    done(null,{})
+  })
