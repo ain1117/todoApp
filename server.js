@@ -57,43 +57,6 @@ app.get('/detail/:id', function(req, res){
     })
   });
 
-app.post('/add', function(req,res){ //누군가가 add로 POST요청을 하면
-    res.send('전송완료') //페이지에 전송완료 응답을 한다.
-    console.log(req.body)
-
-    //counter라는 이름을 가진 콜렉션에서 내가 원하는 데이터 1개만 가져온다. 
-    // = 게시물갯수를 가져온다. 
-    db.collection('counter').findOne({name:'게시물갯수'}, function(err,result){
-        console.log(result.totalPost)
-        if (err) return console.log('게시물갯수 가져오는 중 에러 발생')
-        //가져온 게시물갯수를 변수에 저장한다.
-        let total = result.totalPost
-
-        
-    //_id= 총게시물갯수 + 1 (auto increment)
-
-        db.collection('post').insertOne({_id: total + 1, title: req.body.title, date:req.body.date},function(에러,결과){
-                if(에러) console.log(에러)
-                console.log(result.totalPost)
-                //몽고DB에서 데이터를 수정할 때 updateOne()을 사용한다. 많은 것은 updateMany이다.
-                //updateOne(이런데이터를,이렇게수정해줘,function(){})
-
-                //operator : 연산자.
-            // {$set : {totalPost:바꿀값}}
-            // {$inc : {totalPost:기존값에 더해줄 값}} 같은 것들이 있다.
-        //name이 게시물갯수인것을 찾아, 그곳의 totalPost를 수정한다.
-                db.collection('counter').updateOne({name:'게시물갯수'},{ $inc : {totalPost:1}},function(err,result){
-                       if(err) return console.log('totalPost 증가 중 에러 발생')
-
-                })
-        
-
-    })
-
-    }) 
-
-
-})
 
 app.get('/list', function(req,res){
 
@@ -109,19 +72,6 @@ app.get('/list', function(req,res){
 
 })
 
-app.delete('/delete', function(req,res){
-    console.log(req.body) //요청 시 보낸 데이터가 출력된다.
-    // 요청.body에 담긴 정보에서 내가 삭제할 데이터를 찾아 삭제해 주세요
-    req.body._id = parseInt(req.body._id)
-    console.log(req.body._id)
-    // 실수했던곳 : deleteOne의 첫번째 파라미터는 req.body 이다. 
-    // (나는 req.bkdy._id 라고 해서 실행되지 않았었음) 
-    db.collection('post').deleteOne(req.body,function(err, result){
-        console.log('삭제완료')
-        res.status(200).send({ message:'삭제에 성공했습니다.'}); //응답에 성공했을 때 띄우는 메세지
-    })
-    
-})
 
 app.get('/edit/:id', function(req, res){
     db.collection('post').findOne({_id:parseInt(req.params.id)},function(err,result){
@@ -197,10 +147,118 @@ passport.use(new LocalStrategy({ //Strategy방식 인증을 구현한다.
   //id를 이용해 세셩을 저장시킨다.(로그인 성공시 실행된다.)
   //그리고 아이디와 비밀번호로 생성한 세션을 쿠키로 보낸다.
   passport.serializeUser(function(user, done){
-    done(null, user.id)
+    done(null, user.id) 
   })
 
   //이 세션 아이디를 가진 사람을 db에서 찾아달라는 구문(MyPage를 만들때 사용한다.)
   passport.deserializeUser(function(아이디,done){
-    done(null,{})
+    db.collection('login').findOne({id:아이디},function(err,result){
+      //하..여기서 변수인 result를 { result } 로 잘못 전해줘서
+      // 계속 안됐었음 ㅠㅠ 변수는 오브젝트 형식으로 전해주지 않기를 잊지 말자..   
+      done(null,result)
+    })
+  
   })
+
+  // 파라미터로 전해진 함수는 순차적으로 실행된다.
+  //즉, isLogin을 실행한 뒤 콜백 함수를 실행한다.
+  app.get('/myPage', isLogin, function(req,res){
+    console.log(req.user) //deserializeUser에서 찾은 정보가 들어있다. 
+    console.log(req.user.id)
+    res.render('myPage.ejs',{ myUser : req.user })
+  })
+
+  //미들웨어를 만든다.
+  
+  //1.로그인 여부를 확인한다.
+  function isLogin(req,res,next){
+    if(req.user){ //로그인 후 세션이 있으면, req.user가 존재한다.
+        next()
+    } else{
+        res.send('로그인하지 않았습니다.')
+    }
+  }
+  
+  app.post('/register', function(req,res){
+    //id 중복검사
+        db.collection('login').findOne({id:req.body.id}, function(err,result){
+      
+      console.log(result) //db에서 검색한 결과 출력
+      // !result가 안되는 이유 : result가 null일 경우 역연산을 할 수 없다.(비어있기 때문)
+      if(result==null) { 
+        console.log('가입 가능한 아이디입니다.')
+        db.collection('login').insertOne({ id: req.body.id, pw: req.body.pw }, function (에러, 결과) {
+        console.log(result) //가입 결과 출력
+        res.send('회원가입에 성공하였습니다.')
+        })
+       }  else if (result) return console.log('이미 존재하는 아이디입니다.')
+    })
+  })
+
+  
+app.post('/add', function(req,res){ //누군가가 add로 POST요청을 하면
+  res.send('전송완료') //페이지에 전송완료 응답을 한다.
+  console.log(req.body)
+      
+
+  //counter라는 이름을 가진 콜렉션에서 내가 원하는 데이터 1개만 가져온다. 
+  // = 게시물갯수를 가져온다. 
+  db.collection('counter').findOne({name:'게시물갯수'}, function(err,result){
+      console.log(result.totalPost)
+      if (err) return console.log('게시물갯수 가져오는 중 에러 발생')
+      //가져온 총게시물갯수를 변수에 저장한다.
+      let total = result.totalPost
+
+      //글을 저장할 때 저장할 것들 
+      let savePost = { _id : total +1, title: req.body.title, date: req.body.date, writer: req.user._id }
+
+      
+  //_id= 총게시물갯수 + 1 (auto increment)
+
+      db.collection('post').insertOne(savePost,function(에러,결과){
+              if(에러) console.log(에러)
+              console.log(result.totalPost)
+              //몽고DB에서 데이터를 수정할 때 updateOne()을 사용한다. 많은 것은 updateMany이다.
+              //updateOne(이런데이터를,이렇게수정해줘,function(){})
+
+              //operator : 연산자.
+              // {$set : {totalPost:바꿀값}}
+              // {$inc : {totalPost:기존값에 더해줄 값}} 같은 것들이 있다.
+              //name이 게시물갯수인것을 찾아, 그곳의 totalPost를 수정한다.
+              db.collection('counter').updateOne({name:'게시물갯수'},{ $inc : {totalPost:1}},function(err,result){
+                     if(err) return console.log('totalPost 증가 중 에러 발생')
+
+              })
+      
+
+  })
+
+  }) 
+
+
+})
+
+app.delete('/delete', function(req,res){
+  console.log(req.body) //요청 시 보낸 데이터가 출력된다.
+  // 요청.body에 담긴 정보에서 내가 삭제할 데이터를 찾아 삭제해 주세요
+  req.body._id = parseInt(req.body._id)
+  console.log(req.body._id)
+  console.log(req.user._id)
+
+  let deleteData = { _id: req.body._id, writer: req.user._id }
+
+  // 실수했던곳 : deleteOne의 첫번째 파라미터는 req.body 이다. 
+  // (나는 req.bkdy._id 라고 해서 실행되지 않았었음) 
+
+  //이후, 로그인한 사람것만 삭제할 수 있도록 수정했음
+  //req.body에 담겨온 게시물번호를 가진 글을 db에서 찾아 삭제해 주세요.
+  db.collection('post').deleteOne(deleteData,function(err, result){
+      console.log('삭제완료')
+      res.status(200).send({ message:'삭제에 성공했습니다.'}); //응답에 성공했을 때 띄우는 메세지
+  })
+  
+})
+//app.use=미들웨어
+app.use('/shop', require('./routes/shop')) 
+app.use('/board/sub/', require('./routes/board'))
+
